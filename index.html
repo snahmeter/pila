@@ -51,13 +51,18 @@
     let evalQueue = [];
     let board, evalChart;
 
-    // We use a lighter engine to ensure single-file stability
+    // Use Stockfish.js via blob worker to avoid CORS issues
     async function initEngine() {
         if (engine) return;
         document.getElementById('status').innerText = "Loading engine...";
-        // LOZZA is a small, UCI-compliant chess engine that works well in a single JS file
-        const engineUrl = 'https://cdn.jsdelivr.net/npm/lozza@1.1.8/lozza.js';
-        engine = new Worker(engineUrl);
+        
+        const workerCode = `
+            importScripts('https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js');
+        `;
+        const blob = new Blob([workerCode], { type: 'application/javascript' });
+        const workerUrl = URL.createObjectURL(blob);
+        
+        engine = new Worker(workerUrl);
         
         engine.onmessage = function(e) {
             const line = e.data;
@@ -68,11 +73,14 @@
                     updateCurrentMoveEval(score);
                 }
             } else if (line.startsWith('bestmove')) {
-                const finished = evalQueue.shift();
+                evalQueue.shift();
                 analyzeNext();
             }
         };
         engine.postMessage('uci');
+        
+        // Give engine time to initialize
+        await new Promise(resolve => setTimeout(resolve, 500));
     }
 
     function updateCurrentMoveEval(score) {
