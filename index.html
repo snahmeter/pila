@@ -2,51 +2,67 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>MrIndyJones Analysis & Board</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MrIndyJones: Correspondence Pro Analysis</title>
     
-    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
     <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #161512; color: #bababa; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        .container { width: 100%; max-width: 900px; background: #262421; padding: 30px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #161512; color: #bababa; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .container { width: 100%; max-width: 1000px; background: #262421; padding: 30px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         
-        /* Board Area Styles */
-        #board-area { width: 400px; margin: 0 auto 30px auto; }
-        #myBoard { width: 100%; border: 3px solid #403d39; border-radius: 4px; }
-        .flip-btn { width: 100%; padding: 8px; margin-top: 10px; background: #403d39; color: #aaa; border: none; border-radius: 4px; cursor: pointer; }
-        .flip-btn:hover { background: #504d49; color: #fff; }
+        #top-layout { display: flex; gap: 30px; flex-wrap: wrap; justify-content: center; margin-bottom: 30px; }
+        
+        /* Board Styles */
+        #board-wrapper { width: 400px; text-align: center; }
+        #myBoard { width: 100%; border: 4px solid #3c3934; border-radius: 4px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        
+        /* Chart Styles */
+        #chart-wrapper { flex: 1; min-width: 320px; background: #1a1917; padding: 15px; border-radius: 8px; border: 1px solid #333; height: 400px; }
+        
+        .ctrl-btn { background: #403d39; color: #fff; border: none; padding: 10px 20px; margin: 10px 5px; border-radius: 4px; cursor: pointer; font-weight: 500; }
+        .ctrl-btn:hover { background: #504d4a; }
+        
+        .main-btn { background: #45a049; color: white; border: none; padding: 15px 40px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 1.1rem; box-shadow: 0 4px 0 #2d6630; transition: all 0.1s; }
+        .main-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #2d6630; }
+        
+        #status { margin-top: 15px; font-style: italic; color: #aaa; font-size: 0.9rem; }
 
         /* Table Styles */
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #1a1917; border-radius: 8px; overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; margin-top: 30px; background: #1a1917; border-radius: 8px; overflow: hidden; }
         th, td { padding: 12px 15px; border-bottom: 1px solid #333; text-align: left; }
-        th { background: #2d2b28; color: #aaa; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 1px; }
+        th { background: #2d2b28; color: #888; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; }
         .eval-cell { font-family: 'Courier New', monospace; font-weight: bold; font-size: 1.1rem; width: 100px; }
         .loading { color: #f1c40f; animation: pulse 1.5s infinite; }
         .positive { color: #7fa650; }
         .negative { color: #ca3431; }
         
-        /* Main Action Button */
-        .main-btn { background: #45a049; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; font-size: 1rem; }
-        .main-btn:hover { background: #52be56; transform: translateY(-1px); }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>Correspondence Analysis</h1>
+    <h1 style="text-align:center; color: #fff; margin-bottom: 30px;">Correspondence Analysis Dashboard</h1>
     
-    <div id="board-area">
-        <div id="myBoard"></div>
-        <button class="flip-btn" onclick="flipBoard()">Flip Board Orientation</button>
+    <div id="top-layout">
+        <div id="board-wrapper">
+            <div id="myBoard"></div>
+            <button class="ctrl-btn" onclick="board.flip()">Flip Perspective</button>
+        </div>
+
+        <div id="chart-wrapper">
+            <canvas id="evalChart"></canvas>
+        </div>
     </div>
 
-    <div style="margin-bottom: 20px; text-align: center;">
-        <button class="main-btn" onclick="fetchAndAnalyze()">Fetch Game & Run Analysis</button>
-        <div id="status" style="margin-top:10px; color: #888; font-style: italic;">Click button to load current game data.</div>
+    <div style="text-align: center;">
+        <button class="main-btn" onclick="fetchAndAnalyze()">Fetch & Analyze Current Game</button>
+        <p id="status">Ready to load data for <strong>mrindyjones</strong></p>
     </div>
 
     <table id="move-table">
@@ -54,41 +70,92 @@
             <tr>
                 <th>#</th>
                 <th>Move</th>
-                <th>Eval</th>
-                <th>FEN Snapshot</th>
+                <th>Evaluation</th>
+                <th>Position (FEN)</th>
             </tr>
         </thead>
         <tbody id="move-body"></tbody>
     </table>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/stockfish@16.0.0/src/stockfish.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/stockfish@10.0.0/src/stockfish.js"></script>
 
 <script>
-    const USERNAME = 'mrindyjones'; // Must be lowercase for header check
-    const engine = new Worker('https://cdn.jsdelivr.net/npm/stockfish@16.0.0/src/stockfish.js');
-    let evalQueue = [];
-    let currentEval = "0.0";
+    const USERNAME = 'mrindyjones';
+    // Using Stockfish 10 for better browser compatibility
+    const engine = new Worker('https://cdn.jsdelivr.net/npm/stockfish@10.0.0/src/stockfish.js');
     
-    // Initialize Visual Board variable
-    var board = null;
+    let evalQueue = [];
+    let currentEvalStr = "0.0";
+    let currentEvalNum = 0;
+    let board = null;
+    let evalChart = null;
 
-    // --- Stockfish Logic ---
+    // --- Chart Setup ---
+    function initChart() {
+        const ctx = document.getElementById('evalChart').getContext('2d');
+        evalChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Advantage',
+                    data: [],
+                    borderColor: '#7fa650',
+                    backgroundColor: 'rgba(127, 166, 80, 0.15)',
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 3,
+                    pointHoverRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { min: -8, max: 8, grid: { color: '#333' }, ticks: { color: '#888' } },
+                    x: { grid: { display: false }, ticks: { color: '#888', maxRotation: 90, minRotation: 90 } }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+
+    // --- Engine Communication ---
     engine.postMessage('uci');
     engine.onmessage = (e) => {
         const line = e.data;
-        if (line.includes('score cp')) {
-            currentEval = (parseInt(line.match(/score cp (-?\d+)/)[1]) / 100).toFixed(1);
-        } else if (line.includes('score mate')) {
-            currentEval = 'M' + Math.abs(line.match(/score mate (-?\d+)/)[1]);
-        }
         
-        // Wait for the "bestmove" signal before updating UI
+        // Extract evaluation
+        if (line.includes('score cp')) {
+            const cpMatch = line.match(/score cp (-?\d+)/);
+            if (cpMatch) {
+                currentEvalNum = parseInt(cpMatch[1]) / 100;
+                currentEvalStr = (currentEvalNum > 0 ? '+' : '') + currentEvalNum.toFixed(1);
+            }
+        } else if (line.includes('score mate')) {
+            const mateMatch = line.match(/score mate (-?\d+)/);
+            if (mateMatch) {
+                const mate = parseInt(mateMatch[1]);
+                currentEvalNum = mate > 0 ? 10 : -10; // Cap mate for graph
+                currentEvalStr = 'M' + Math.abs(mate);
+            }
+        }
+
+        // Wait for final calculation signal
         if (line.startsWith('bestmove')) {
-            const finishedMove = evalQueue.shift();
-            const cell = document.getElementById(`eval-${finishedMove.index}`);
-            cell.innerText = currentEval;
-            cell.className = 'eval-cell ' + (currentEval.startsWith('-') ? 'negative' : (currentEval === '0.0' ? '' : 'positive'));
+            const finished = evalQueue.shift();
+            
+            // Update Table
+            const cell = document.getElementById(`eval-${finished.index}`);
+            cell.innerText = currentEvalStr;
+            cell.className = 'eval-cell ' + (currentEvalStr.startsWith('-') ? 'negative' : (currentEvalStr === '0.0' ? '' : 'positive'));
+            
+            // Update Chart
+            evalChart.data.labels.push(finished.moveName);
+            evalChart.data.datasets[0].data.push(currentEvalNum);
+            evalChart.update();
+
             analyzeNext();
         }
     };
@@ -96,77 +163,81 @@
     function analyzeNext() {
         if (evalQueue.length > 0) {
             const next = evalQueue[0];
-            document.getElementById('status').innerText = `Analyzing move ${next.index + 1} of ${next.totalMoves}...`;
-            currentEval = "0.0"; 
+            document.getElementById('status').innerText = `Analyzing Move ${next.index + 1}...`;
+            
             engine.postMessage('ucinewgame');
+            engine.postMessage('isready');
             engine.postMessage('position fen ' + next.fen);
-            engine.postMessage('go depth 13'); // Depth 13 for solid analysis
+            engine.postMessage('go depth 13');
         } else {
-            document.getElementById('status').innerText = "Analysis Complete.";
+            document.getElementById('status').innerHTML = "<strong>Analysis Complete.</strong>";
         }
     }
 
-    // --- Main Application Logic ---
+    // --- Data Fetching ---
     async function fetchAndAnalyze() {
         const tbody = document.getElementById('move-body');
-        const statusDisplay = document.getElementById('status');
         tbody.innerHTML = "";
         evalQueue = [];
-        statusDisplay.innerText = "Fetching PGN from Lichess...";
-        
+        evalChart.data.labels = [];
+        evalChart.data.datasets[0].data = [];
+        evalChart.update();
+
+        document.getElementById('status').innerText = "Fetching PGN from Lichess...";
+
         try {
+            // Force text/plain to avoid PGN download headers
             const response = await fetch(`https://lichess.org/api/user/${USERNAME}/current-game?t=${Date.now()}`);
-            if (response.status === 204) { statusDisplay.innerText = "No active game found."; return; }
-            
+            if (response.status === 204) {
+                document.getElementById('status').innerText = "No active correspondence game found.";
+                return;
+            }
+
             const pgn = await response.text();
             const chess = new Chess();
             chess.load_pgn(pgn);
 
-            // 1. Update visual board with the CURRENT position
-            const currentFen = chess.fen();
-            board.position(currentFen);
-            
-            // 2. Auto-orient board based on username color
+            // Update board and orientation
+            board.position(chess.fen());
             const headers = chess.header();
-            // Check if Black header exists and matches username (lowercase comparison)
-            if (headers['Black'] && headers['Black'].toLowerCase() === USERNAME) {
+            if (headers.Black && headers.Black.toLowerCase() === USERNAME) {
                 board.orientation('black');
             } else {
                 board.orientation('white');
             }
 
-            // 3. Prepare history analysis
+            // Process moves
             const history = chess.history();
             const tempChess = new Chess();
-            statusDisplay.innerText = `Loaded ${history.length} moves. Starting analysis...`;
-
             history.forEach((move, i) => {
                 tempChess.move(move);
                 const fen = tempChess.fen();
                 const row = tbody.insertRow();
-                row.innerHTML = `<td>${i + 1}</td><td><strong>${move}</strong></td><td id="eval-${i}" class="loading">...</td><td style="font-size:0.7rem; color:#666; font-family:monospace;">${fen.substring(0,25)}...</td>`;
-                evalQueue.push({ index: i, fen: fen, totalMoves: history.length });
+                row.innerHTML = `
+                    <td>${i + 1}</td>
+                    <td><strong>${move}</strong></td>
+                    <td id="eval-${i}" class="loading">Thinking...</td>
+                    <td style="font-size:0.65rem; color:#555; font-family:monospace;">${fen.split(' ')[0]}...</td>
+                `;
+                evalQueue.push({ index: i, fen: fen, moveName: move });
             });
 
             analyzeNext();
         } catch (err) {
             console.error(err);
-            statusDisplay.innerText = "Error loading game data.";
+            document.getElementById('status').innerText = "Error: Could not reach Lichess API.";
         }
     }
 
-    // --- Board Functions ---
-    function flipBoard() {
-        if(board) board.flip();
-    }
-
-    // Initialize board on page load (jQuery style)
-    $(document).ready(function () {
-        // Initialize with start position, prevent dragging for read-only view
+    // --- Initialization ---
+    $(document).ready(() => {
         board = Chessboard('myBoard', {
             position: 'start',
-            draggable: false 
+            draggable: false,
+            // Piece theme fix for visual board
+            pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
         });
+        initChart();
     });
 </script>
 </body>
