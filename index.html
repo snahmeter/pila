@@ -2,102 +2,129 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MrIndyJones Live Eval</title>
+    <title>MrIndyJones: Move History Eval</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #161512; color: #bababa; text-align: center; padding: 20px; }
-        .container { max-width: 600px; margin: auto; background: #262421; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-        h1 { color: #fff; margin-bottom: 10px; }
-        #eval-box { font-size: 4rem; font-weight: bold; margin: 20px 0; color: #fff; transition: all 0.3s; }
-        .label { color: #999; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 1px; }
-        #fen-display { font-family: monospace; font-size: 0.85rem; background: #1a1a1a; padding: 10px; border-radius: 4px; overflow-wrap: break-word; margin-top: 20px; }
-        .status { margin-top: 10px; font-style: italic; color: #666; }
+        body { font-family: 'Segoe UI', sans-serif; background: #161512; color: #bababa; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .container { width: 100%; max-width: 800px; background: #262421; padding: 20px; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; border-bottom: 1px solid #333; text-align: left; }
+        th { color: #888; text-transform: uppercase; font-size: 0.8rem; }
+        .eval-cell { font-weight: bold; font-family: monospace; font-size: 1.1rem; }
+        .loading { color: #666; font-style: italic; }
+        .positive { color: #7fa650; }
+        .negative { color: #ca3431; }
+        button { background: #45a049; color: white; border: none; padding: 12px 24px; border-radius: 4px; cursor: pointer; margin-bottom: 20px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>Lichess Live: mrindyjones</h1>
-    
-    <div class="label">Current Evaluation</div>
-    <div id="eval-box">0.0</div>
-    
-    <div class="label">Game Status</div>
-    <div id="status" class="status">Connecting to Lichess...</div>
+    <h1>Game Analysis: mrindyjones</h1>
+    <button onclick="fetchAndAnalyze()">Fetch & Analyze Game History</button>
+    <div id="status">Ready.</div>
 
-    <div class="label" style="margin-top:20px;">Current FEN</div>
-    <div id="fen-display">Waiting for active game...</div>
+    <table id="move-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Move</th>
+                <th>Evaluation</th>
+                <th>FEN (Snapshot)</th>
+            </tr>
+        </thead>
+        <tbody id="move-body"></tbody>
+    </table>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/stockfish@16.0.0/src/stockfish.js"></script>
 
 <script>
     const USERNAME = 'mrindyjones';
-    const evalBox = document.getElementById('eval-box');
-    const fenDisplay = document.getElementById('fen-display');
-    const statusDisplay = document.getElementById('status');
-
-    // Initialize Stockfish Worker
     const engine = new Worker('https://cdn.jsdelivr.net/npm/stockfish@16.0.0/src/stockfish.js');
-    
+    let evalQueue = [];
+
+    // Engine logic to handle the queue
     engine.onmessage = (e) => {
         const msg = e.data;
-        // Parse Stockfish output for evaluation
-        if (msg.includes('score cp')) {
-            const score = parseInt(msg.match(/score cp (-?\d+)/)[1]);
-            // Format to 1 decimal place (e.g., 150 -> +1.5)
-            const formatted = (score / 100).toFixed(1);
-            evalBox.innerText = (score > 0 ? '+' : '') + formatted;
-            updateEvalColor(score / 100);
-        } else if (msg.includes('score mate')) {
-            const mate = msg.match(/score mate (-?\d+)/)[1];
-            evalBox.innerText = 'M' + Math.abs(mate);
-            evalBox.style.color = '#ffcc00';
+        if (msg.includes('score cp') || msg.includes('score mate')) {
+            let scoreStr = "0.0";
+            if (msg.includes('cp')) {
+                const cp = parseInt(msg.match(/score cp (-?\d+)/)[1]);
+                scoreStr = (cp / 100).toFixed(1);
+            } else {
+                const mate = msg.match(/score mate (-?\d+)/)[1];
+                scoreStr = 'M' + Math.abs(mate);
+            }
+
+            // Update the UI for the move currently being analyzed
+            if (evalQueue.length > 0) {
+                const currentMoveObj = evalQueue.shift();
+                const cell = document.getElementById(`eval-${currentMoveObj.index}`);
+                cell.innerText = scoreStr;
+                cell.className = 'eval-cell ' + (parseFloat(scoreStr) >= 0 ? 'positive' : 'negative');
+                
+                // Process next in queue
+                processQueue();
+            }
         }
     };
 
-    function updateEvalColor(val) {
-        if (val > 1) evalBox.style.color = '#7fa650'; // Winning
-        else if (val < -1) evalBox.style.color = '#ca3431'; // Losing
-        else evalBox.style.color = '#fff'; // Even
-    }
-
-    async function fetchCurrentGame() {
-        try {
-            // Using the 'playing' endpoint to get the FEN directly
-            const response = await fetch(`https://lichess.org/api/user/${USERNAME}/current-game`);
-            
-            if (response.status === 204) {
-                statusDisplay.innerText = "No active game found.";
-                evalBox.innerText = "0.0";
-                return;
-            }
-
-            // We fetch the text (PGN/NDJSON) and extract the FEN
-            // Note: If you want the live FEN, it's better to use the NDJSON stream or the game ID
-            // For simplicity, we fetch the game ID and then the state
-            const text = await response.text();
-            
-            // Extract FEN if it exists in the PGN response
-            const fenMatch = text.match(/\[FEN "(.*?)"\]/);
-            if (fenMatch && fenMatch[1]) {
-                const currentFEN = fenMatch[1];
-                fenDisplay.innerText = currentFEN;
-                statusDisplay.innerText = "Game in progress...";
-                
-                // Send to Stockfish
-                engine.postMessage('position fen ' + currentFEN);
-                engine.postMessage('go depth 12'); // Fast depth for responsiveness
-            }
-        } catch (err) {
-            console.error("Fetch error:", err);
-            statusDisplay.innerText = "Error connecting to API.";
+    function processQueue() {
+        if (evalQueue.length > 0) {
+            const next = evalQueue[0];
+            engine.postMessage('position fen ' + next.fen);
+            engine.postMessage('go depth 12'); // Fast depth to get through history quickly
+        } else {
+            document.getElementById('status').innerText = "Analysis Complete.";
         }
     }
 
-    // Run immediately then every 5 seconds
-    fetchCurrentGame();
-    setInterval(fetchCurrentGame, 5000);
+    async function fetchAndAnalyze() {
+        const tbody = document.getElementById('move-body');
+        const status = document.getElementById('status');
+        tbody.innerHTML = "";
+        evalQueue = [];
+        status.innerText = "Fetching PGN...";
+
+        try {
+            const response = await fetch(`https://lichess.org/api/user/${USERNAME}/current-game?t=${Date.now()}`);
+            if (response.status === 204) { status.innerText = "No active game."; return; }
+
+            const pgn = await response.text();
+            const game = new Chess();
+            
+            if (!game.load_pgn(pgn)) {
+                status.innerText = "Error loading PGN.";
+                return;
+            }
+
+            const history = game.history();
+            const tempGame = new Chess(); // Used to step through moves
+            
+            // Generate rows and queue
+            history.forEach((move, i) => {
+                tempGame.move(move);
+                const currentFen = tempGame.fen();
+                
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td>${i + 1}</td>
+                    <td>${move}</td>
+                    <td id="eval-${i}" class="loading">Thinking...</td>
+                    <td style="font-size:0.7rem; color:#555;">${currentFen.substring(0, 30)}...</td>
+                `;
+
+                evalQueue.push({ index: i, fen: currentFen });
+            });
+
+            status.innerText = "Analyzing history...";
+            processQueue();
+
+        } catch (err) {
+            status.innerText = "Error: " + err.message;
+        }
+    }
 </script>
 
 </body>
